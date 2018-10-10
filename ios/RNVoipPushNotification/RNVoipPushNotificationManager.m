@@ -24,16 +24,16 @@ static NSString *RCTCurrentAppBackgroundState()
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         states = @{
-            @(UIApplicationStateActive): @"active",
-            @(UIApplicationStateBackground): @"background",
-            @(UIApplicationStateInactive): @"inactive"
-        };
+                   @(UIApplicationStateActive): @"active",
+                   @(UIApplicationStateBackground): @"background",
+                   @(UIApplicationStateInactive): @"inactive"
+                   };
     });
-
+    
     if (RCTRunningInAppExtension()) {
         return @"extension";
     }
-
+    
     return states[@(RCTSharedApplication().applicationState)] ? : @"unknown";
 }
 
@@ -66,10 +66,15 @@ RCT_EXPORT_MODULE();
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
++ (BOOL)requiresMainQueueSetup
+{
+    return YES;
+}
+
 - (void)setBridge:(RCTBridge *)bridge
 {
     _bridge = bridge;
-
+    
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(handleRemoteNotificationsRegistered:)
                                                  name:RNVoipRemoteNotificationsRegistered
@@ -107,22 +112,22 @@ RCT_EXPORT_MODULE();
     } else {
         types = UIUserNotificationTypeAlert | UIUserNotificationTypeBadge | UIUserNotificationTypeSound;
     }
-
+    
     UIApplication *app = RCTSharedApplication();
     UIUserNotificationSettings *notificationSettings =
-        [UIUserNotificationSettings settingsForTypes:(NSUInteger)types categories:nil];
+    [UIUserNotificationSettings settingsForTypes:(NSUInteger)types categories:nil];
     [app registerUserNotificationSettings:notificationSettings];
 }
 
 - (void)voipRegistration
 {
     NSLog(@"[RNVoipPushNotificationManager] voipRegistration");
-
+    
     dispatch_queue_t mainQueue = dispatch_get_main_queue();
     // Create a push registry object
     PKPushRegistry * voipRegistry = [[PKPushRegistry alloc] initWithQueue: mainQueue];
     // Set the registry's delegate to AppDelegate
-    voipRegistry.delegate = (RNVoipPushNotificationManager *)RCTSharedApplication().delegate;
+    voipRegistry.delegate = (id<PKPushRegistryDelegate>)RCTSharedApplication().delegate;
     // Set the push type to VoIP
     voipRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
 }
@@ -130,13 +135,13 @@ RCT_EXPORT_MODULE();
 - (NSDictionary *)checkPermissions
 {
     NSUInteger types = [RCTSharedApplication() currentUserNotificationSettings].types;
-  
+    
     return @{
-        @"alert": @((types & UIUserNotificationTypeAlert) > 0),
-        @"badge": @((types & UIUserNotificationTypeBadge) > 0),
-        @"sound": @((types & UIUserNotificationTypeSound) > 0),
-    };
-  
+             @"alert": @((types & UIUserNotificationTypeAlert) > 0),
+             @"badge": @((types & UIUserNotificationTypeBadge) > 0),
+             @"sound": @((types & UIUserNotificationTypeSound) > 0),
+             };
+    
 }
 
 + (NSString *)getCurrentAppBackgroundState
@@ -147,7 +152,7 @@ RCT_EXPORT_MODULE();
 + (void)didUpdatePushCredentials:(PKPushCredentials *)credentials forType:(NSString *)type
 {
     NSLog(@"[RNVoipPushNotificationManager] didUpdatePushCredentials credentials.token = %@, type = %@", credentials.token, type);
-
+    
     NSMutableString *hexString = [NSMutableString string];
     NSUInteger voipTokenLength = credentials.token.length;
     const unsigned char *bytes = credentials.token.bytes;
@@ -190,20 +195,26 @@ RCT_EXPORT_MODULE();
 
 RCT_EXPORT_METHOD(requestPermissions:(NSDictionary *)permissions)
 {
+    NSLog(@"[RNVoipPushNotificationManager] requestPermissions");
     if (RCTRunningInAppExtension()) {
         return;
     }
-    [self registerUserNotification:permissions];
-    [self voipRegistration];
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self registerUserNotification:permissions];
+        [self voipRegistration];
+    });
 }
 
 RCT_EXPORT_METHOD(checkPermissions:(RCTResponseSenderBlock)callback)
 {
+    NSLog(@"[RNVoipPushNotificationManager] checkPermissions");
+    
     if (RCTRunningInAppExtension()) {
         callback(@[@{@"alert": @NO, @"badge": @NO, @"sound": @NO}]);
         return;
     }
-
+    
     callback(@[[self checkPermissions]]);
 }
 
