@@ -190,6 +190,19 @@ RCT_EXPORT_MODULE();
                                                 body:notification.userInfo];
 }
 
+RCT_EXPORT_METHOD(registerForVoipPushes)
+{
+    NSLog(@"[RNVoipPushNotificationManager] registerForVoipPushes");
+    if (RCTRunningInAppExtension()) {
+        return;
+    }
+
+    // This will only register for voip push tokens. Permission to present notifications is not asked.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self voipRegistration];
+    });
+}
+
 RCT_EXPORT_METHOD(requestPermissions:(NSDictionary *)permissions)
 {
     if (RCTRunningInAppExtension()) {
