@@ -24,10 +24,10 @@ static NSString *RCTCurrentAppBackgroundState()
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         states = @{
-                   @(UIApplicationStateActive): @"active",
-                   @(UIApplicationStateBackground): @"background",
-                   @(UIApplicationStateInactive): @"inactive"
-                   };
+            @(UIApplicationStateActive): @"active",
+            @(UIApplicationStateBackground): @"background",
+            @(UIApplicationStateInactive): @"inactive"
+        };
     });
 
     if (RCTRunningInAppExtension()) {
@@ -64,11 +64,6 @@ RCT_EXPORT_MODULE();
 - (void)dealloc
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-}
-
-+ (BOOL)requiresMainQueueSetup
-{
-    return YES;
 }
 
 - (void)setBridge:(RCTBridge *)bridge
@@ -115,7 +110,7 @@ RCT_EXPORT_MODULE();
 
     UIApplication *app = RCTSharedApplication();
     UIUserNotificationSettings *notificationSettings =
-    [UIUserNotificationSettings settingsForTypes:(NSUInteger)types categories:nil];
+        [UIUserNotificationSettings settingsForTypes:(NSUInteger)types categories:nil];
     [app registerUserNotificationSettings:notificationSettings];
 }
 
@@ -124,24 +119,26 @@ RCT_EXPORT_MODULE();
     NSLog(@"[RNVoipPushNotificationManager] voipRegistration");
 
     dispatch_queue_t mainQueue = dispatch_get_main_queue();
-    // Create a push registry object
-    PKPushRegistry * voipRegistry = [[PKPushRegistry alloc] initWithQueue: mainQueue];
-    // Set the registry's delegate to AppDelegate
-    voipRegistry.delegate = (id<PKPushRegistryDelegate>)RCTSharedApplication().delegate;
-    // Set the push type to VoIP
-    voipRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
+    dispatch_async(mainQueue, ^{
+      // Create a push registry object
+      PKPushRegistry * voipRegistry = [[PKPushRegistry alloc] initWithQueue: mainQueue];
+      // Set the registry's delegate to AppDelegate
+      voipRegistry.delegate = (RNVoipPushNotificationManager *)RCTSharedApplication().delegate;
+      // Set the push type to VoIP
+      voipRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
+    });
 }
 
 - (NSDictionary *)checkPermissions
 {
     NSUInteger types = [RCTSharedApplication() currentUserNotificationSettings].types;
-
+  
     return @{
-             @"alert": @((types & UIUserNotificationTypeAlert) > 0),
-             @"badge": @((types & UIUserNotificationTypeBadge) > 0),
-             @"sound": @((types & UIUserNotificationTypeSound) > 0),
-             };
-
+        @"alert": @((types & UIUserNotificationTypeAlert) > 0),
+        @"badge": @((types & UIUserNotificationTypeBadge) > 0),
+        @"sound": @((types & UIUserNotificationTypeSound) > 0),
+    };
+  
 }
 
 + (NSString *)getCurrentAppBackgroundState
@@ -195,34 +192,17 @@ RCT_EXPORT_MODULE();
 
 RCT_EXPORT_METHOD(requestPermissions:(NSDictionary *)permissions)
 {
-    NSLog(@"[RNVoipPushNotificationManager] requestPermissions");
     if (RCTRunningInAppExtension()) {
         return;
     }
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self registerUserNotification:permissions];
-        [self voipRegistration];
-    });
-}
-
-RCT_EXPORT_METHOD(registerForVoipPushes)
-{
-    NSLog(@"[RNVoipPushNotificationManager] registerForVoipPushes");
-    if (RCTRunningInAppExtension()) {
-        return;
-    }
-
-    // This will only register for voip push tokens. Permission to present notifications is not asked.
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self voipRegistration];
-    });
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self registerUserNotification:permissions];
+    [self voipRegistration];
+  });
 }
 
 RCT_EXPORT_METHOD(checkPermissions:(RCTResponseSenderBlock)callback)
 {
-    NSLog(@"[RNVoipPushNotificationManager] checkPermissions");
-
     if (RCTRunningInAppExtension()) {
         callback(@[@{@"alert": @NO, @"badge": @NO, @"sound": @NO}]);
         return;
@@ -233,7 +213,14 @@ RCT_EXPORT_METHOD(checkPermissions:(RCTResponseSenderBlock)callback)
 
 RCT_EXPORT_METHOD(presentLocalNotification:(UILocalNotification *)notification)
 {
-    [RCTSharedApplication() presentLocalNotificationNow:notification];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [RCTSharedApplication() presentLocalNotificationNow:notification];
+    });
+}
+
++ (BOOL)requiresMainQueueSetup
+{
+    return YES;
 }
 
 @end
